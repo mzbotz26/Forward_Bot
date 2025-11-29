@@ -4,7 +4,6 @@ import os
 from dotenv import load_dotenv
 
 # .env फ़ाइल से सभी variables को लोड करें
-load_dotenv()
 
 # --- Telegram Bot Configuration ---
 # Telegram Bot Token, जिसे BotFather से प्राप्त किया जाता है।
