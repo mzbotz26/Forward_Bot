@@ -2,8 +2,6 @@
 
 import os
 
-# .env फ़ाइल से सभी variables को लोड करें
-
 # --- Telegram Bot Configuration ---
 # Telegram Bot Token, जिसे BotFather से प्राप्त किया जाता है।
 BOT_TOKEN = os.getenv("")
