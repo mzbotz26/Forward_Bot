@@ -8,13 +8,13 @@ load_dotenv()
 
 # --- Telegram Bot Configuration ---
 # Telegram Bot Token, जिसे BotFather से प्राप्त किया जाता है।
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("7771472205:AAENcUwaWSrT_zx2W8agFA_BS5auhOn7pN4")
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN Environment Variable सेट नहीं है।")
 
 # --- MongoDB Configuration ---
 # MongoDB कनेक्शन स्ट्रिंग (URI), जिसे MongoDB Atlas या आपके सर्वर से प्राप्त किया जाता है।
-MONGO_URI = os.getenv("MONGO_URI")
+MONGO_URI = os.getenv("mongodb+srv://ybawaskar1987:bBpiCuWZ5RLKuuzg@mzfilestore.ah4tr.mongodb.net/?retryWrites=true&w=majority&appName=mzfilestore")
 if not MONGO_URI:
     raise ValueError("MONGO_URI Environment Variable सेट नहीं है।")
 
