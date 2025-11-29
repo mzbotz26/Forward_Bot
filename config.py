@@ -8,7 +8,7 @@ load_dotenv()
 
 # --- Telegram Bot Configuration ---
 # Telegram Bot Token, जिसे BotFather से प्राप्त किया जाता है।
-BOT_TOKEN = os.getenv("7771472205:AAENcUwaWSrT_zx2W8agFA_BS5auhOn7pN4")
+BOT_TOKEN = os.getenv("")
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN Environment Variable सेट नहीं है।")
 
