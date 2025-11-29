@@ -19,7 +19,7 @@ if not MONGO_URI:
     raise ValueError("MONGO_URI Environment Variable सेट नहीं है।")
 
 # MongoDB Database का नाम जहाँ चैनल IDs सेव होंगी।
-DB_NAME = "TelegramForwarderDB"
+DB_NAME = "mzfilestore"
 
 # MongoDB Collection का नाम जहाँ Source और Target चैनल पेयर्स सेव होंगे।
 COLLECTION_NAME = "channel_pairs"
