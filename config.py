@@ -1,7 +1,6 @@
 # config.py
 
 import os
-from dotenv import load_dotenv
 
 # .env फ़ाइल से सभी variables को लोड करें
 
