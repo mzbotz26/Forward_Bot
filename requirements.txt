@@ -1,4 +1,3 @@
-python-telegram-bot>=20.0
-pymongo
-python-dotenv
-
+pyrogram==2.0.106
+tgcrypto
+motor==3.7.1
