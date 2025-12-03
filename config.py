@@ -1,22 +1,8 @@
-# config.py
-
 import os
 
-# --- Telegram Bot Configuration ---
-# Telegram Bot Token, जिसे BotFather से प्राप्त किया जाता है।
-BOT_TOKEN = os.getenv("")
-if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN Environment Variable सेट नहीं है।")
+API_ID = int(os.getenv("API_ID", 12345))
+API_HASH = os.getenv("API_HASH", "your_api_hash_here")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "your_bot_token_here")
 
-# --- MongoDB Configuration ---
-# MongoDB कनेक्शन स्ट्रिंग (URI), जिसे MongoDB Atlas या आपके सर्वर से प्राप्त किया जाता है।
-MONGO_URI = os.getenv("mongodb+srv://ybawaskar1987:bBpiCuWZ5RLKuuzg@mzfilestore.ah4tr.mongodb.net/?retryWrites=true&w=majority&appName=mzfilestore")
-if not MONGO_URI:
-    raise ValueError("MONGO_URI Environment Variable सेट नहीं है।")
-
-# MongoDB Database का नाम जहाँ चैनल IDs सेव होंगी।
-DB_NAME = "mzfilestore"
-
-# MongoDB Collection का नाम जहाँ Source और Target चैनल पेयर्स सेव होंगे।
-COLLECTION_NAME = "channel_pairs"
-
+MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+DB_NAME = os.getenv("DB_NAME", "forward_bot_db")
