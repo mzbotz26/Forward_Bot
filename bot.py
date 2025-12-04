@@ -1,4 +1,4 @@
-# bot.py  (Koyeb-ready)
+# bot.py  (Koyeb-ready, fixed)
 import os
 import logging
 import time
@@ -14,7 +14,7 @@ API_HASH = os.getenv("API_HASH", "")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 MONGO_URI = os.getenv("MONGO_URI", "")
 DB_NAME = os.getenv("DB_NAME", "forwarder")
-COLLECTION = os.getenv("COLLECTION", "links")  # we'll use 'links' by default
+COLLECTION = os.getenv("COLLECTION", "links")
 
 # ---------------- Basic checks ----------------
 if not (API_ID and API_HASH and BOT_TOKEN):
@@ -36,7 +36,6 @@ def home():
 
 def run_flask():
     port = int(os.environ.get("PORT", 8000))
-    # disable Flask logging spam in production
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)
     app.run(host="0.0.0.0", port=port)
@@ -44,7 +43,6 @@ def run_flask():
 # ---------------- MongoDB connection ----------------
 try:
     mongo = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
-    # force a connection attempt to fail fast if credentials/URI bad
     mongo.server_info()
     db = mongo[DB_NAME]
     links_col = db[COLLECTION]
@@ -59,11 +57,10 @@ bot = Client(
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN,
-    # Work nice on hosted envs — keep session in memory
     workdir="."
 )
 
-# ---------------- Helpers (synchronous, using pymongo) ----------------
+# ---------------- Helpers ----------------
 def ensure_user_doc(user_id: int):
     if links_col.find_one({"user_id": user_id}) is None:
         links_col.insert_one({
@@ -71,7 +68,7 @@ def ensure_user_doc(user_id: int):
             "source_chat_id": None,
             "target_chat_id": None,
             "is_active": False,
-            "state": None  # can be "await_source" or "await_target"
+            "state": None
         })
 
 def get_link(user_id: int):
@@ -95,7 +92,7 @@ def get_state(user_id: int):
     doc = links_col.find_one({"user_id": user_id})
     return doc.get("state")
 
-def set_active(user_id: int, val: bool):
+def set_active(user_id: int, val):
     ensure_user_doc(user_id)
     links_col.update_one({"user_id": user_id}, {"$set": {"is_active": bool(val)}})
 
@@ -105,6 +102,152 @@ def start_keyboard():
         [
             [KeyboardButton("📥 Set Source Channel")],
             [KeyboardButton("📤 Set Target Channel")],
+            [KeyboardButton("▶️ Start Forwarding"), KeyboardButton("⏸ Stop Forwarding")],
+            [KeyboardButton("ℹ️ Status")]
+        ],
+        resize_keyboard=True
+    )
+
+# ---------------- Commands & Handlers ----------------
+@bot.on_message(filters.command("start") & filters.private)
+async def start_cmd(client, message):
+    user_id = message.from_user.id
+    ensure_user_doc(user_id)
+    link = get_link(user_id)
+    text = (
+        "📡 Forward Bot Setup\n\n"
+        f"Source: {link.get('source_chat_id')}\n"
+        f"Target: {link.get('target_chat_id')}\n"
+        f"Active: {link.get('is_active')}\n\n"
+        "Buttons se configure karein."
+    )
+    await message.reply_text(text, reply_markup=start_keyboard())
+
+@bot.on_message(filters.private & filters.text & filters.regex(r"^📥 Set Source Channel$"))
+async def kb_set_source(client, message):
+    user_id = message.from_user.id
+    await message.reply_text("Source channel ka ID ya @username bhejo.\nExample: -1001234567890 ya @my_source_channel")
+    set_state(user_id, "await_source")
+
+@bot.on_message(filters.private & filters.text & filters.regex(r"^📤 Set Target Channel$"))
+async def kb_set_target(client, message):
+    user_id = message.from_user.id
+    await message.reply_text("Target channel ka ID ya @username bhejo.\nExample: -1009876543210 ya @my_target_channel")
+    set_state(user_id, "await_target")
+
+@bot.on_message(filters.private & filters.text & filters.regex(r"^▶️ Start Forwarding$"))
+async def kb_start_forwarding(client, message):
+    user_id = message.from_user.id
+    link = get_link(user_id)
+    if not link.get("source_chat_id") or not link.get("target_chat_id"):
+        await message.reply_text("❗ Pehle Source aur Target set karein.")
+        return
+    set_active(user_id, True)
+    await message.reply_text("✅ Forwarding started.", reply_markup=start_keyboard())
+
+@bot.on_message(filters.private & filters.text & filters.regex(r"^⏸ Stop Forwarding$"))
+async def kb_stop_forwarding(client, message):
+    user_id = message.from_user.id
+    set_active(user_id, False)
+    await message.reply_text("⏸ Forwarding stopped.", reply_markup=start_keyboard())
+
+@bot.on_message(filters.private & filters.text & filters.regex(r"^ℹ️ Status$"))
+async def kb_status(client, message):
+    user_id = message.from_user.id
+    link = get_link(user_id)
+    await message.reply_text(
+        f"Source: {link.get('source_chat_id')}\n"
+        f"Target: {link.get('target_chat_id')}\n"
+        f"Active: {link.get('is_active')}",
+        reply_markup=start_keyboard()
+    )
+
+@bot.on_message(filters.private & filters.text)
+async def private_text_handler(client, message):
+    user_id = message.from_user.id
+    state = get_state(user_id)
+    text = message.text.strip()
+
+    if state == "await_source":
+        if text.startswith("@"):
+            chat_id = text
+        else:
+            try:
+                chat_id = int(text)
+            except ValueError:
+                await message.reply_text("Galat ID. Example: -1001234567890 ya @username. Dobara bhejo.")
+                return
+        set_source(user_id, chat_id)
+        set_state(user_id, None)
+        await message.reply_text(f"✅ Source set: {chat_id}", reply_markup=start_keyboard())
+        return
+
+    if state == "await_target":
+        if text.startswith("@"):
+            chat_id = text
+        else:
+            try:
+                chat_id = int(text)
+            except ValueError:
+                await message.reply_text("Galat ID. Example: -1009876543210 ya @username. Dobara bhejo.")
+                return
+        set_target(user_id, chat_id)
+        set_state(user_id, None)
+        await message.reply_text(f"✅ Target set: {chat_id}", reply_markup=start_keyboard())
+        return
+
+    if text.startswith("/") or text in ["📥 Set Source Channel", "📤 Set Target Channel", "▶️ Start Forwarding", "⏸ Stop Forwarding", "ℹ️ Status"]:
+        return
+    await message.reply_text("Setup ke liye /start use karo.", reply_markup=start_keyboard())
+
+@bot.on_message(filters.channel)
+async def channel_forwarder(client, message):
+    chat_id = message.chat.id
+    try:
+        cursor = links_col.find({
+            "source_chat_id": {"$in": [chat_id, str(chat_id)]},
+            "is_active": True,
+            "target_chat_id": {"$ne": None}
+        })
+    except Exception as e:
+        logger.exception("MongoDB query failed in forwarder: %s", e)
+        return
+
+    for link in cursor:
+        target = link.get("target_chat_id")
+        if not target:
+            continue
+        try:
+            await message.copy(chat_id=target)
+            logger.info("Forwarded message from %s -> %s for user %s", chat_id, target, link.get("user_id"))
+        except Exception as e:
+            logger.exception("Forward error for mapping %s -> %s : %s", chat_id, target, e)
+
+@bot.on_message(filters.command("ping") & filters.private)
+async def ping_cmd(client, message):
+    t0 = time.time()
+    m = await message.reply_text("Pinging...")
+    dt = int((time.time() - t0) * 1000)
+    await m.edit_text(f"Pong! {dt} ms")
+
+def run_bot():
+    logger.info("Starting Pyrogram client...")
+    try:
+        bot.run()
+    except Exception as e:
+        logger.exception("Bot crashed: %s", e)
+        raise
+
+if __name__ == "__main__":
+    flask_thread = Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    logger.info("Flask health server started on port %s", os.environ.get("PORT", "8000"))
+
+    try:
+        run_bot()
+    except Exception as e:
+        logger.exception("Unhandled error in main: %s", e)
+        raise            [KeyboardButton("📤 Set Target Channel")],
             [KeyboardButton("▶️ Start Forwarding"), KeyboardButton("⏸ Stop Forwarding")],
             [KeyboardButton("ℹ️ Status")]
         ],
