@@ -256,5 +256,8 @@ async def ping_cmd(client, message):
 # ---------- Main ----------
 
 if __name__ == "__main__":
+    import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
     logger.info("Bot starting...")
     bot.run()
