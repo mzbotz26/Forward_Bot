@@ -1,110 +1,117 @@
-import asyncio
-import logging
-import time
-
 from pyrogram import Client, filters
-from pyrogram.types import (
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-)
+from pyrogram.types import ReplyKeyboardMarkup, KeyboardButton
+from pymongo import MongoClient
+from config import *
 
-from motor.motor_asyncio import AsyncIOMotorClient
+# ========== MONGO DB SETUP ==========
+mongo = MongoClient(MONGO_URI)
+db = mongo[DB_NAME]
+users = db[COLLECTION]
 
-from config import API_ID, API_HASH, BOT_TOKEN, MONGODB_URI, DB_NAME
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
-
-# ---------- MongoDB setup ----------
-mongo_client = AsyncIOMotorClient(MONGODB_URI)
-db = mongo_client[DB_NAME]
-links_col = db["links"]          # channel mapping
-states_col = db["user_states"]   # user input states
-
-
-# ---------- Pyrogram client ----------
+# ========== TELEGRAM BOT SETUP ==========
 bot = Client(
     "forwarder-bot",
     api_id=API_ID,
     api_hash=API_HASH,
-    bot_token=BOT_TOKEN,
+    bot_token=BOT_TOKEN
 )
 
+# ========== START BUTTONS ==========
+main_buttons = ReplyKeyboardMarkup(
+    [
+        [KeyboardButton("📥 Set Source Channel")],
+        [KeyboardButton("📤 Set Target Channel")],
+        [KeyboardButton("🚀 Start Bot")]
+    ],
+    resize_keyboard=True
+)
 
-# ---------- Helper functions ----------
+# ========== START COMMAND ==========
+@bot.on_message(filters.command("start"))
+async def start(_, msg):
+    user_id = msg.from_user.id
 
-async def get_link(user_id: int) -> dict:
-    doc = await links_col.find_one({"user_id": user_id})
-    if not doc:
-        doc = {
-            "user_id": user_id,
-            "source_chat_id": None,
-            "target_chat_id": None,
-            "is_active": False,
-        }
-        await links_col.insert_one(doc)
-    return doc
+    # MongoDB में user entry create अगर न हो
+    if not users.find_one({"user_id": user_id}):
+        users.insert_one({"user_id": user_id, "source": None, "target": None})
 
-
-async def set_source(user_id: int, chat_id: int):
-    await links_col.update_one(
-        {"user_id": user_id},
-        {"$set": {"source_chat_id": chat_id}},
-        upsert=True,
+    await msg.reply(
+        "Welcome! 👋\n\nSet your Source & Target channels.",
+        reply_markup=main_buttons
     )
 
 
-async def set_target(user_id: int, chat_id: int):
-    await links_col.update_one(
-        {"user_id": user_id},
-        {"$set": {"target_chat_id": chat_id}},
-        upsert=True,
-    )
+# ========== SOURCE CHANNEL SET ==========
+@bot.on_message(filters.text == "📥 Set Source Channel")
+async def set_source(_, msg):
+    await msg.reply("Source channel ID भेजें (जैसे: `-1001234567890`)")
 
 
-async def set_active(user_id: int, value: bool):
-    await links_col.update_one(
-        {"user_id": user_id},
-        {"$set": {"is_active": value}},
-        upsert=True,
-    )
+@bot.on_message(filters.regex(r"^-100"))
+async def save_channel(_, msg):
+    user_id = msg.from_user.id
+    text = msg.text
 
-
-async def set_state(user_id: int, state: str | None):
-    if state is None:
-        await states_col.delete_one({"user_id": user_id})
+    if "source" not in text:
+        users.update_one(
+            {"user_id": user_id},
+            {"$set": {"source": text}}
+        )
+        await msg.reply("✅ Source channel saved!")
         return
-    await states_col.update_one(
+
+
+# ========== TARGET CHANNEL SET ==========
+@bot.on_message(filters.text == "📤 Set Target Channel")
+async def set_target(_, msg):
+    await msg.reply("Target channel ID भेजें (जैसे: `-1001234567890`)")
+
+
+@bot.on_message(filters.regex(r"^-100"))
+async def save_target(_, msg):
+    user_id = msg.from_user.id
+    text = msg.text
+
+    users.update_one(
         {"user_id": user_id},
-        {"$set": {"state": state}},
-        upsert=True,
+        {"$set": {"target": text}}
     )
+    await msg.reply("✅ Target channel saved!")
 
 
-async def get_state(user_id: int) -> str | None:
-    doc = await states_col.find_one({"user_id": user_id})
-    return doc["state"] if doc else None
+# ========== START BOT ==========
+@bot.on_message(filters.text == "🚀 Start Bot")
+async def start_forwarding(_, msg):
+    user = users.find_one({"user_id": msg.from_user.id})
+
+    if not user["source"] or not user["target"]:
+        await msg.reply("❗ पहले Source और Target सेट करें!")
+        return
+
+    await msg.reply("Bot चालू हो चुका है! अब Source channel में पोस्ट करते ही Target में जाएगा।")
 
 
-def start_keyboard():
-    return InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton("Source", callback_data="set_source"),
-                InlineKeyboardButton("Target", callback_data="set_target"),
-            ],
-            [
-                InlineKeyboardButton("Start", callback_data="toggle_start"),
-            ],
-        ]
-    )
+
+# ========== AUTO FORWARDER ==========
+@bot.on_message(filters.channel)
+async def auto_forwarder(client, msg):
+    # सारे user configs लूप करें
+    all_users = users.find()
+
+    for user in all_users:
+        source = str(user.get("source"))
+        target = int(user.get("target"))
+
+        # अगर यह उसी यूज़र का Source channel है
+        if str(msg.chat.id) == source:
+            try:
+                await msg.copy(chat_id=target)
+            except Exception as e:
+                print("Forward error:", e)
 
 
-# ---------- Handlers ----------
-
+print("Bot is running...")
+bot.run()
 @bot.on_message(filters.command("start") & filters.private)
 async def start_cmd(client, message):
     user_id = message.from_user.id
