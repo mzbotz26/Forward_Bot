@@ -1,8 +1,12 @@
 import os
+from dotenv import load_dotenv
 
-API_ID = int(os.getenv("API_ID", ))
-API_HASH = os.getenv("API_HASH", "")
-BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+load_dotenv()
 
-MONGODB_URI = os.getenv("MONGODB_URI", "")
-DB_NAME = os.getenv("DB_NAME", "forward_bot_db")
+API_ID = int(os.getenv("API_ID"))
+API_HASH = os.getenv("API_HASH")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+MONGO_URI = os.getenv("MONGO_URI")
+DB_NAME = "forwarder_db"
+COLLECTION = "users"
