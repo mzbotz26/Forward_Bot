@@ -8,5 +8,5 @@ API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 MONGO_URI = os.getenv("MONGO_URI")
-DB_NAME = "forwarder_db"
-COLLECTION = "users"
+DB_NAME = "forwarder"
+COLLECTION = "links"
