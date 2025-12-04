@@ -3,10 +3,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-API_ID = int(os.getenv("13441344"))
-API_HASH = os.getenv("2f10533d9068507d0c10bf1074527167")
-BOT_TOKEN = os.getenv("7771472205:AAENcUwaWSrT_zx2W8agFA_BS5auhOn7pN4")
+API_ID = int(os.getenv("API_ID"))
+API_HASH = os.getenv("API_HASH")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-MONGO_URI = os.getenv("mongodb+srv://Anant:Anant@movieforu.09ibn.mongodb.net/?retryWrites=true&w=majority&appName=Movieforu")
+MONGO_URI = os.getenv("MONGO_URI")
 DB_NAME = "forwarder_db"
 COLLECTION = "users"
